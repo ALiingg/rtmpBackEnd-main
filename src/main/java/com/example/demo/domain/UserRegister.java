@@ -3,19 +3,19 @@ package com.example.demo.domain;
 import jakarta.persistence.*;
 
 
-@Table(name = "userData")
 @Entity
-public class User {
-    // 注意属性名要与数据表中的字段名一致
-    // 主键自增int(10)对应long
+public class UserRegister {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long uid;
     private String token;
-    // 用户名属性varchar对应String
     private String uname;
     private String email;
     private int role = 0;
+    private String code;
+    private String passcode;
+
     public String getEmail() {
         return email;
     }
@@ -61,5 +61,18 @@ public class User {
     }
     public void setRole(int role) {
         this.role = role;
+    }
+
+    public String getCode() {
+        return code;
+    }
+    public void setCode(String code) {
+        this.code = code;
+    }
+    public String getPasscode() {
+        return passcode;
+    }
+    public void setPasscode(String passcode) {
+        this.passcode = passcode;
     }
 }

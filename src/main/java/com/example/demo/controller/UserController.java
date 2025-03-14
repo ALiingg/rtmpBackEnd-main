@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.domain.User;
+import com.example.demo.domain.UserRegister;
 import com.example.demo.domain.VerificationCode;
 import com.example.demo.repository.VerificationCodeRepository;
 import com.example.demo.service.EmailService;
@@ -9,18 +10,25 @@ import com.example.demo.service.serviceImpl.UserServiceImpl;
 import com.example.demo.utils.CodeGenerator;
 import com.example.demo.utils.Result;
 import jakarta.annotation.Resource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import com.example.demo.utils.randomUUID;
 
+import javax.management.relation.Role;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.TemporalAmount;
+import java.util.List;
 import java.util.Objects;
 
 @RestController
 @RequestMapping("/user")
 public class UserController {
 
+    private static final Logger log = LoggerFactory.getLogger(UserController.class);
     // Inject UserService to handle user-related operations
     @Resource
     private UserService userService;
@@ -41,10 +49,22 @@ public class UserController {
 
 
             VerificationCode verificationCode = new VerificationCode();
+
             verificationCode.setEmail(email);
             verificationCode.setCode(code);
             verificationCode.setCreatedAt(LocalDateTime.now());
             verificationCode.setExpiresAt(LocalDateTime.now().plusMinutes(5));
+            List<VerificationCode> find = verificationCodeRepository.findByEmail(email);
+
+                if (find.size() > 0) {
+                    Duration duration = Duration.between(find.get(find.size() - 1).getCreatedAt(), LocalDateTime.now());
+
+                    if (duration.toMinutes() < 5) {
+                        return Result.error("678", "Verification request too frequent. Please try again later.");
+
+                    }
+
+            }
 
             verificationCodeRepository.save(verificationCode); // save to db
             emailService.sendEmail(email, code); // send email
@@ -84,7 +104,7 @@ public class UserController {
         }
     }
     /**
-     * Handles user login requests.
+     * Handles user  login requests.
      * @param uname Username of the user trying to log in
      * @param password Password of the user
      * @return Result object containing user data and success message if login is successful,
@@ -93,7 +113,9 @@ public class UserController {
     @PostMapping("/login")
     public Result<User> loginController(@RequestParam String uname, @RequestParam String password) {
         // Call the login service to authenticate user
-
+        if (uname.contains("@")){
+            return loginByEmail(uname, password);
+        }
         User user = userService.loginService(uname, password);
 
         // Check if user exists
@@ -122,21 +144,19 @@ public class UserController {
      */
     @Transactional
     @PostMapping("/register")
-    public Result<User> registController(@RequestParam String uname, @RequestParam String password, @RequestParam String passcode, @RequestParam String email, @RequestParam String code) {
-        if (!verifyCode(email, code)) {
-            System.out.println(code);
-            System.out.println(email);
-            return Result.error("123", "Incorrect verification code!");
+    public Result<User> registController(@RequestBody UserRegister userRegister) {
+        if (!verifyCode(userRegister.getEmail(), userRegister.getCode())) {
+
+            return Result.error("122", "Incorrect verification code!");
         }
         String pscode = "123456";
-        System.out.println(passcode + passcode.equals(pscode));
-        if (!passcode.equals(pscode)) {
+        if (!userRegister.getPasscode().equals(pscode)) {
             return Result.error("123", "Incorrect passcode!");
         }
         User newUser = new User();
-        newUser.setUsername(uname);
-        newUser.setPassword(password);
-        newUser.setEmail(email);
+        newUser.setUsername(userRegister.getUsername());
+        newUser.setPassword(userRegister.getPassword());
+        newUser.setEmail(userRegister.getEmail());
 
 
         // Call the registration service to create a new user
@@ -170,6 +190,16 @@ public class UserController {
             return Result.success(user, "Token valid");
         } else {
             // Return error if the token is invalid
+            return Result.error("456", "Token invalid");
+        }
+    }
+    @PostMapping("/getRoleByToken")
+    public Result<Integer> getRoleByToken(@RequestBody String token) {
+        System.out.println(token);
+        User user = userServiceImpl.tokenService(token);
+        if (user != null) {
+            return Result.success(user.getRole());
+        } else {
             return Result.error("456", "Token invalid");
         }
     }
